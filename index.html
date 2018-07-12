@@ -8,20 +8,18 @@
   </head>
 
   <body>
-  smth about us
+
   </body>
 
 </html>
 
 <script>
 var data;
-var flag = false;
+var flag =false;
 async function preload(){
+const model = await tf.loadModel('converted/model.json');
 
-const model = tf.loadModel('converted/model.json');
 }
-
-
 function draw(){
 if(model!=null && !flag){
   console.log(model);
@@ -29,10 +27,9 @@ if(model!=null && !flag){
   }
 }
 
-
-
 function setup(){
 
 
 }
+
 </script>
