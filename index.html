@@ -15,15 +15,19 @@
 
 <script>
 var data;
+var flag = false;
 async function preload(){
 
 const model = tf.loadModel('converted/model.json');
 
-// const model = await tf.loadModel('https://api.myjson.com/bins/127ojy');
-
-  //data = loadJSON();
 }
 function draw(){
+function draw(){
+if(model!=null && !flag){
+  console.log(model);
+  flag=true;
+  }
+}
 
 }
 
