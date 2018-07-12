@@ -16,8 +16,8 @@
 <script>
 var data;
 async function preload(){
-data = loadJSON('https://my-json-server.typicode.com/Steve0929/Classifier/db');
-const model = tf.loadModel('http://localhost:3000/modeltopology');
+
+const model = tf.loadModel('model.json');
 
 // const model = await tf.loadModel('https://api.myjson.com/bins/127ojy');
 
