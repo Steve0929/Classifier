@@ -1,1 +1,2 @@
 epoch 29, loss: 1.1593
+Training file: tay.txt
