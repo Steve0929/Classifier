@@ -10,62 +10,100 @@
   <body>
     <form>
       Texto:<br>
-      <input type="text" name="texto"><br>
+      <input type="text" id="texto" name="texto"><br>
+      <button id="Button" type="button" onclick="pred()">Start</button>
+      <p id="out"> out here </p>
     </form>
   </body>
 
 </html>
 
 <script>
-var INPUT_LENGTH= 40;
+var INPUT_LENGTH= 25;
+var CHARS_TO_GENERATE = 250;
+var DIVERSITY = 1;
 
+var modelo;
 var flag =false;
+var char_indices = {"\n": 0, " ": 1, "!": 2, "\"": 3, "&": 4, "'": 5, "(": 6, ")": 7, ",": 8, "-": 9,
+ ".": 10, "/": 11, "0": 12, "1": 13, "2": 14, "3": 15, "4": 16, "5": 17, "6": 18, "7": 19, "8": 20,
+ "9": 21, ":": 22, ";": 23, "?": 24, "[": 25, "]": 26, "a": 27, "b": 28, "c": 29, "d": 30, "e": 31,
+ "f": 32, "g": 33, "h": 34, "i": 35, "j": 36, "k": 37, "l": 38, "m": 39, "n": 40, "o": 41, "p": 42,
+ "q": 43, "r": 44, "s": 45, "t": 46, "u": 47, "v": 48, "w": 49, "x": 50, "y": 51, "z": 52, "{": 53,
+ "}": 54}
+
 var indices_char = {"0": "\n", "1": " ", "2": "!", "3": "\"", "4": "'", "5": "(", "6": ")", "7": ",",
 "8": "-", "9": ".", "10": "0", "11": "1", "12": "2", "13": "3", "14": "4", "15": "5", "16": "6","17":
 "7", "18": "8", "19": "9", "20": ":", "21": ";", "22": "=", "23": "?", "24": "[", "25": "]", "26": "_",
 "27": "a", "28": "b", "29": "c", "30": "d", "31": "e", "32": "f",
 "33": "g", "34": "h", "35": "i", "36": "j", "37": "k", "38": "l", "39": "m", "40": "n", "41": "o",
 "42": "p", "43": "q", "44": "r", "45": "s", "46": "t", "47": "u", "48": "v", "49": "w", "50": "x",
-"51": "y", "52": "z", "53": "\u00e4", "54": "\u00e6", "55": "\u00e9", "56": "\u00eb"}
-var char_indices = {"\u00e9": 55, "\u00e6": 54, "\n": 0, "!": 2, " ": 1, "\"": 3, "'": 4, ")": 6,
-"(": 5, "-": 8, ",": 7, ".": 9, "1": 11, "0": 10, "3": 13, "2": 12, "5": 15, "4": 14, "7": 17,
-"6": 16, "9": 19, "8": 18, ";": 21, ":": 20, "=": 22, "?": 23, "[": 24, "]": 25, "_": 26,
-"\u00e4": 53, "a": 27, "c": 29, "b": 28, "e": 31, "d": 30, "g": 33, "f": 32, "i": 35, "h": 34,
-"k": 37, "j": 36, "m": 39, "l": 38, "o": 41, "n": 40, "q": 43, "p": 42, "s": 45, "r": 44, "u": 47,
-"t": 46, "w": 49, "v": 48, "y": 51, "x": 50, "z": 52, "\u00eb": 56}
+"51": "y", "52": "z", "53": "{", "54": "}"}
 
 async function preload(){
-// const model = await tf.loadModel('https://api.myjson.com/bins/127ojy');
-//data = loadJSON('https://my-json-server.typicode.com/Steve0929/Classifier/db');
-//const model = await tf.loadModel('https://storage.googleapis.com/tfjs-models/tfjs/iris_v1/model.json');
-var model = await tf.loadModel('converted/model.json');
+document.getElementById("Button").disabled = true;
+tf.loadModel('model_exported_30epochs/model.json').then((model) => {
+   modelo = model;
+   modelo.summary();
+   document.getElementById("Button").disabled = false;
+  //init();
+ });
 }
 function draw(){
 if(model!=null && !flag){
-  console.log(model);
-  pred();
   flag=true;
   }
 }
 
-function setup(){
+async function pred(){
+var word = document.getElementById('texto').value;
+for(var i =0;i<CHARS_TO_GENERATE;i++){
+    const indexTensor = tf.tidy(() => {
+    const input = this.convert(word);
+    const prediction = modelo.predict(input).squeeze();
+    return sample(prediction);
+  })
+  const index = await indexTensor.data();
+  indexTensor.dispose();
+  word += indices_char[index];
+  document.getElementById('texto').innerHTML= word;
+  console.log(word);
+  await tf.nextFrame();
+}
 
 }
 
-function pred(){
-var word = "t";
-word.toLowerCase();
-var buffer =  tf.buffer([1, INPUT_LENGTH, Object.keys(indices_char).length]);
-buffer.set(1, 0, 0, char_indices[word]);
-var input = buffer.toTensor();
-model.summary();
 
-  /*const buffer = tf.buffer([2, 2]);
-  buffer.set(3, 0, 0);
-  buffer.set(5, 1, 0);
+/**
+ * Converts sentence to Tensor for feeding into model.
+ */
+function convert(sentence) {
+  sentence = sentence.toLowerCase();
+  sentence = sentence.split('').filter(x => x in char_indices).join('');
+  if (sentence.length < INPUT_LENGTH) {
+    sentence = sentence.padStart(INPUT_LENGTH);
+  } else if (sentence.length > INPUT_LENGTH) {
+    sentence = sentence.substring(sentence.length - INPUT_LENGTH);
+  }
+  const buffer = tf.buffer([1, INPUT_LENGTH, Object.keys(indices_char).length]);
+  for (let i = 0; i < INPUT_LENGTH; i++) {
+    let char = sentence.charAt(i)
+    buffer.set(1, 0, i, char_indices[char]);
+  }
+  const input = buffer.toTensor();
+  return input;
+  }
 
-  buffer.toTensor().print(); */
 
-//model.predict(word);
-}
+ function sample(prediction) {
+   return tf.tidy(() => {
+     prediction = prediction.log();
+     const diversity = tf.scalar(DIVERSITY);
+     prediction = prediction.div(diversity);
+     prediction = prediction.exp();
+     prediction = prediction.div(prediction.sum());
+     prediction = prediction.mul(tf.randomUniform(prediction.shape));
+     return prediction.argMax();
+   });
+ }
 </script>
