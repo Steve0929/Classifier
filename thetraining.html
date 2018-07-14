@@ -1,0 +1,278 @@
+<html>
+  <head>
+    <!-- Load TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@0.12.0"> </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.5.11/p5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.5.11/addons/p5.dom.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.5.11/addons/p5.sound.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/nicolaspanel/numjs@0.15.1/dist/numjs.min.js"></script>
+  </head>
+
+  <body>
+    <form>
+      Texto:<br>
+      <input type="text" id="texto" name="texto"><br>
+      <button id="Button" type="button" onclick="pred()">Start</button>
+      <p id="out"> out here </p>
+    </form>
+    Select file to read <input type="file" onchange="loadFile(this)">
+       <pre id="data"></pre>
+  </body>
+
+</html>
+<script type="text/javascript">
+var txt;
+         function loadFile(o)
+               {
+                   var fr = new FileReader();
+                   fr.onload = function(e)
+                       {
+                           showDataFile(e, o);
+                       };
+                   fr.readAsText(o.files[0]);
+
+               }
+
+               function showDataFile(e, o)
+               {   txt = e.target.result
+                    devText();
+                   //document.getElementById("data").innerText = e.target.result;
+               }
+
+var INPUT_LENGTH= 20 ;
+var CHARS_TO_GENERATE = 200;
+var DIVERSITY = 0.5;
+
+var modelo;
+var flag =false;
+
+async function preload(){
+
+}
+
+async function devText(){
+var maxlen=20;
+var step =3;
+var sentences = [];
+var next_chars = [];
+var chars;
+txt = txt.toLowerCase();
+var texto = Array.from(txt);
+console.log("corpus len "+txt.length);
+var inran = txt.length-maxlen;
+for (let i = 0; i<=inran; i+=step) {
+
+  //  sentences.push(texto[i+maxlen]);
+    sentences.push(texto.slice(i,i+maxlen));
+    next_chars[i] =next_chars[i] +txt[i+maxlen];
+  }
+console.log('Number of sequences'+sentences.length);
+chars =texto.filter(onlyUnique);
+chars = chars.sort();
+console.log('The chars: '+chars);
+var dict = [];
+for (let i = 0;i<chars.length;i++) {
+    dict[i] = chars[i];
+    }
+console.log(dict);
+var charlen = chars.length;
+
+//Create the architecture of the model
+/*
+const lstm = tf.layers.lstm({units: 128, returnSequences: true});
+const input = tf.input({shape: [maxlen, charlen]});
+const output = lstm.apply(input);
+
+const denseLayer = tf.layers.dense({units: charlen, activation: 'softmax'});*/
+
+const themodel = tf.sequential();
+
+
+
+themodel.add(tf.layers.lstm({units:128, inputShape: [maxlen, charlen]}));
+themodel.add(tf.layers.dense({units: charlen,  activation: 'softmax'}));
+var optimizer = tf.train.rmsprop (learningRate = 0.01);
+themodel.compile({optimizer: optimizer, loss: 'categoricalCrossentropy'});
+themodel.summary();
+
+
+console.log("Vectorization");
+//var x = nj.zeros([sentences.length,maxlen,charlen], 'int32');
+//var y = nj.zeros([sentences.length,charlen], 'int32');
+
+var x = tf.zeros([sentences.length,maxlen,charlen],'float32');
+var y = tf.zeros([sentences.length,charlen],'float32');
+
+for (let i = 0;i<sentences.length;i++) {
+    let sentence = sentences[i];
+    for (let t=0;t<sentence.length;t++) {
+          caracter = sentence[i];
+          x[i, t, chars.indexOf(caracter)] = 1;
+    }
+    y[i, chars.indexOf(next_chars[i])] = 1
+}
+
+/*
+var themodel2;
+tf.loadModel('https://raw.githubusercontent.com/Steve0929/Classifier/master/converted/model.json').then((mode) => {
+   themodel2 = mode;
+   var optimizer2 = tf.train.rmsprop (learningRate = 0.01);
+   themodel2.compile({optimizer: optimizer2, loss: 'categoricalCrossentropy'});
+
+   console.log("el de github");
+   themodel2.summary();
+   const h = themodel2.fit(x, y, {
+     batchSize: 20,
+     epochs: 1
+   });
+ });   */
+
+/*
+for (let i = 0; i<2;i++) {
+    console.log("Epoca "+i);
+    const h = await themodel.fit(x, y, {
+      batchSize: 20,
+      epochs: 1
+    });
+    pred();
+   console.log("Loss after Epoch " + i + " : " + h.history.loss[0]);
+
+}  */
+/*
+const h = themodel.fit(x, y, {
+  batchSize: 20,
+  epochs: 1
+}); */
+/*
+for (let i = 1; i < 2 ; ++i) {
+   const h = await themodel.fit(x, y, {
+       batchSize: 60,
+       epochs: 1,
+   });
+   console.log("Loss after Epoch " + i + " : " + h.history.loss[0]);
+}
+*/
+const opts={
+   epochs: 1,
+   batchSize: 60
+}
+console.log("Training model...");
+themodel.fit(x,y,opts).then(async results=>{
+          console.log(results.history.loss);
+          console.log("Saving model...");
+          const saveResults = await themodel.save('downloads://trainedInJS');
+          saveModel();
+        });
+
+
+
+}
+
+async function saveModel(){
+    console.log("Completed!");
+}
+
+function sample(prediction) {
+  return tf.tidy(() => {
+    prediction = prediction.log();
+    const diversity = tf.scalar(DIVERSITY);
+    prediction = prediction.div(diversity);
+    prediction = prediction.exp();
+    prediction = prediction.div(prediction.sum());
+    prediction = prediction.mul(tf.randomUniform(prediction.shape));
+    return prediction.argMax();
+  });
+}
+
+
+
+function generateExampleBeginIndices_() {
+   // Prepare beginning indices of examples.
+   this.exampleBeginIndices_ = [];
+   for (let i = 0;i < this.textLen_ - this.sampleLen_ - 1; i += this.sampleStep_) {
+     this.exampleBeginIndices_.push(i);
+   }
+
+   // Randomly shuffle the beginning indices.
+   tf.util.shuffle(this.exampleBeginIndices_);
+   this.examplePosition_ = 0;
+ }
+
+async function pred(){
+var word = document.getElementById('texto').value;
+for(var i =0;i<CHARS_TO_GENERATE;i++){
+    const indexTensor = tf.tidy(() => {
+    const input = this.convert(word);
+    const prediction = themodel.predict(input).squeeze();
+    return sample(prediction);
+  })
+  const index = await indexTensor.data();
+  indexTensor.dispose();
+  word += indices_char[index];
+  document.getElementById('texto').innerHTML= word;
+  console.log(word);
+  await tf.nextFrame();
+  }
+  themodel.layers[0].getWeights()[1].print();
+}
+
+
+/**
+ * Converts sentence to Tensor for feeding into model.
+ */
+function convert(sentence) {
+  sentence = sentence.toLowerCase();
+  sentence = sentence.split('').filter(x => x in char_indices).join('');
+  if (sentence.length < INPUT_LENGTH) {
+    sentence = sentence.padStart(INPUT_LENGTH);
+  } else if (sentence.length > INPUT_LENGTH) {
+    sentence = sentence.substring(sentence.length - INPUT_LENGTH);
+  }
+  const buffer = tf.buffer([1, INPUT_LENGTH, Object.keys(indices_char).length]);
+  for (let i = 0; i < INPUT_LENGTH; i++) {
+    let char = sentence.charAt(i)
+    buffer.set(1, 0, i, char_indices[char]);
+  }
+  const input = buffer.toTensor();
+  return input;
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+//UTILS
+function onlyUnique(value, index, self) {
+    return self.indexOf(value) === index;
+}
+function range(start, stop, step) {
+    if (typeof stop == 'undefined') {
+        // one param defined
+        stop = start;
+        start = 0;
+    }
+
+    if (typeof step == 'undefined') {
+        step = 1;
+    }
+
+    if ((step > 0 && start >= stop) || (step < 0 && start <= stop)) {
+        return [];
+    }
+
+    var result = [];
+    for (var i = start; step > 0 ? i < stop : i > stop; i += step) {
+        result.push(i);
+    }
+
+    return result;
+};
+
+ </script>
