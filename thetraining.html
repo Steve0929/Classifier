@@ -21,6 +21,18 @@
 
 </html>
 <script type="text/javascript">
+
+var char_indices;
+var indices_char =
+ {"0": "\n", "1": "", "2": " ", "3": "!", "4": "\U0022", "5": "&", "6": "'", "7": "(",
+"8": ")", "9": ",", "10": "-", "11": ".", "12": "0", "13": "1", "14": "2", "15": "3", "16": "4","17":
+"5", "18": "6", "19": "7", "20": "8", "21": "9", "22": ":", "23": ";", "24": "?", "25": "[", "26": "]",
+"27": "a", "28": "b", "29": "c", "30": "d", "31": "e", "32": "f",
+"33": "g", "34": "h", "35": "i", "36": "j", "37": "k", "38": "l", "39": "m", "40": "n", "41": "o",
+"42": "p", "43": "q", "44": "r", "45": "s", "46": "t", "47": "u", "48": "v", "49": "w", "50": "x",
+"51": "y", "52": "z", "53": "ï", "54": "\u2013", "55": "\u2014", "56": "\u2018"
+, "57": "\u2019", "58": "\u201c", "59": "\u201d", "60": "\u2026"};
+
 var txt;
          function loadFile(o)
                {
@@ -59,17 +71,29 @@ var chars;
 txt = txt.toLowerCase();
 var texto = Array.from(txt);
 console.log("corpus len "+txt.length);
-var inran = txt.length-maxlen;
-for (let i = 0; i<=inran; i+=step) {
 
-  //  sentences.push(texto[i+maxlen]);
-    sentences.push(texto.slice(i,i+maxlen));
-    next_chars[i] =next_chars[i] +txt[i+maxlen];
+
+var inran = txt.length-maxlen;
+console.log("txtlen "+txt.length);
+console.log("Inran"+inran);
+for (let i = 0; i<inran; i+=step) {
+    let tmp = txt.slice(i, i+maxlen);
+    let tmp2 = txt[i+maxlen];
+    sentences.push(tmp);
+    next_chars.push(tmp2);
+    //sentences.push(texto[i+maxlen]);
+    //sentences.push(texto.slice(i,i+maxlen));
+    //next_chars[i] =next_chars[i] +txt[i+maxlen];
   }
 console.log('Number of sequences'+sentences.length);
+console.log('Sentence 0 '+sentences[0]);
+console.log('Next_chars 0 '+next_chars[0]);
 chars =texto.filter(onlyUnique);
+//chars =sentences.filter(onlyUnique);
 chars = chars.sort();
 console.log('The chars: '+chars);
+char_indices = chars;
+
 var dict = [];
 for (let i = 0;i<chars.length;i++) {
     dict[i] = chars[i];
@@ -78,90 +102,75 @@ console.log(dict);
 var charlen = chars.length;
 
 //Create the architecture of the model
-/*
-const lstm = tf.layers.lstm({units: 128, returnSequences: true});
-const input = tf.input({shape: [maxlen, charlen]});
-const output = lstm.apply(input);
-
-const denseLayer = tf.layers.dense({units: charlen, activation: 'softmax'});*/
-
 const themodel = tf.sequential();
-
-
-
-themodel.add(tf.layers.lstm({units:128, inputShape: [maxlen, charlen]}));
+themodel.add(tf.layers.lstm({units:12,  inputShape: [maxlen, charlen]}));
 themodel.add(tf.layers.dense({units: charlen,  activation: 'softmax'}));
 var optimizer = tf.train.rmsprop (learningRate = 0.01);
 themodel.compile({optimizer: optimizer, loss: 'categoricalCrossentropy'});
 themodel.summary();
 
-
+//Vectorization
 console.log("Vectorization");
-//var x = nj.zeros([sentences.length,maxlen,charlen], 'int32');
-//var y = nj.zeros([sentences.length,charlen], 'int32');
+//var x = tf.zeros([sentences.length,maxlen,charlen],'float32');
+//var y = tf.zeros([sentences.length,charlen],'float32');
 
-var x = tf.zeros([sentences.length,maxlen,charlen],'float32');
-var y = tf.zeros([sentences.length,charlen],'float32');
+var x = tf.fill([sentences.length,maxlen,charlen],0);
+var y = tf.fill([sentences.length,charlen],0);
 
+var buffer = tf.buffer ([sentences.length,maxlen,charlen]);
+var buffery = tf.buffer ([sentences.length,charlen]);
+
+console.log("t index is: "+char_indices.indexOf('t'));
+
+/*
 for (let i = 0;i<sentences.length;i++) {
     let sentence = sentences[i];
     for (let t=0;t<sentence.length;t++) {
-          caracter = sentence[i];
-          x[i, t, chars.indexOf(caracter)] = 1;
+          caracter = sentence[t];
+          let holder = char_indices.indexOf(caracter);
+          x[i, t, holder] = 1;
     }
-    y[i, chars.indexOf(next_chars[i])] = 1
-}
-
-/*
-var themodel2;
-tf.loadModel('https://raw.githubusercontent.com/Steve0929/Classifier/master/converted/model.json').then((mode) => {
-   themodel2 = mode;
-   var optimizer2 = tf.train.rmsprop (learningRate = 0.01);
-   themodel2.compile({optimizer: optimizer2, loss: 'categoricalCrossentropy'});
-
-   console.log("el de github");
-   themodel2.summary();
-   const h = themodel2.fit(x, y, {
-     batchSize: 20,
-     epochs: 1
-   });
- });   */
-
-/*
-for (let i = 0; i<2;i++) {
-    console.log("Epoca "+i);
-    const h = await themodel.fit(x, y, {
-      batchSize: 20,
-      epochs: 1
-    });
-    pred();
-   console.log("Loss after Epoch " + i + " : " + h.history.loss[0]);
-
-}  */
-/*
-const h = themodel.fit(x, y, {
-  batchSize: 20,
-  epochs: 1
-}); */
-/*
-for (let i = 1; i < 2 ; ++i) {
-   const h = await themodel.fit(x, y, {
-       batchSize: 60,
-       epochs: 1,
-   });
-   console.log("Loss after Epoch " + i + " : " + h.history.loss[0]);
+    y[i, char_indices.indexOf(next_chars[i])] = 1
 }
 */
+var kha = buffer;
+var khay = buffery;
+
+var myArr = new Array(sentences.length*maxlen*charlen);
+
+var njx= nj.zeros([sentences.length,maxlen,charlen], 'int32');
+var njy = nj.zeros([sentences.length,charlen], 'int32');
+
+console.log("nj length:  "+njx.size);
+
+let labels=[];
+
+const sequencesBuffer = tf.buffer([sentences.length,maxlen,charlen]);
+const labelsBuffer = tf.buffer([sentences.length,charlen]);
+ for (let i = 0; i < sentences.length; ++i) {
+      let sentence = sentences[i];
+   for (let j = 0; j < sentence.length; ++j) {
+      caracter = sentence[j];
+      sequencesBuffer.set(1, i, j, char_indices.indexOf(caracter));
+   }
+   labelsBuffer.set(1, i, char_indices.indexOf(next_chars[i]));
+ }
+console.log("kaka "+sequencesBuffer.get(0,0,0));
+const pop = sequencesBuffer.toTensor();
+const lalay = labelsBuffer.toTensor();
+
 const opts={
-   epochs: 1,
+   epochs: 3,
    batchSize: 60
 }
 console.log("Training model...");
-themodel.fit(x,y,opts).then(async results=>{
+themodel.fit(pop,lalay,opts).then(async results=>{
+          modelo = themodel;
           console.log(results.history.loss);
           console.log("Saving model...");
           const saveResults = await themodel.save('downloads://trainedInJS');
           saveModel();
+          pred();
         });
 
 
@@ -199,11 +208,12 @@ function generateExampleBeginIndices_() {
  }
 
 async function pred(){
-var word = document.getElementById('texto').value;
+//var word = document.getElementById('texto').value;
+var word = txt.slice(5,20);
 for(var i =0;i<CHARS_TO_GENERATE;i++){
     const indexTensor = tf.tidy(() => {
     const input = this.convert(word);
-    const prediction = themodel.predict(input).squeeze();
+    const prediction = modelo.predict(input).squeeze();
     return sample(prediction);
   })
   const index = await indexTensor.data();
@@ -213,7 +223,7 @@ for(var i =0;i<CHARS_TO_GENERATE;i++){
   console.log(word);
   await tf.nextFrame();
   }
-  themodel.layers[0].getWeights()[1].print();
+  //modelo.layers[0].getWeights()[1].print();
 }
 
 
@@ -230,15 +240,12 @@ function convert(sentence) {
   }
   const buffer = tf.buffer([1, INPUT_LENGTH, Object.keys(indices_char).length]);
   for (let i = 0; i < INPUT_LENGTH; i++) {
-    let char = sentence.charAt(i)
+    let char = sentence.charAt(i);
     buffer.set(1, 0, i, char_indices[char]);
   }
   const input = buffer.toTensor();
   return input;
   }
-
-
-
 
 
 
