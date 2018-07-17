@@ -10,6 +10,9 @@
       <input type="number" id="inputEpoch">
       <p>Select .txt file with train data:</p>
       <input type="file" onchange="loadFile(this)">
+      <p>Load de JSON model and the weights:</p>
+        <input type="file" id="json-upload">
+          <input type="file" id="weights-upload">
       <pre id="data"></pre>
     </form>
     <button onclick="createModel()">Start</button>
@@ -100,16 +103,7 @@ for (let i = 0;i<chars.length;i++) {
 //console.log(dict);
 var charlen = chars.length;
 
-//Create the architecture of the model
-const themodel = tf.sequential();
-themodel.add(tf.layers.lstm({units:12,  inputShape: [maxlen, charlen]}));
-themodel.add(tf.layers.dense({units: charlen,  activation: 'softmax'}));
-var optimizer = tf.train.rmsprop (learningRate = 0.01);
-themodel.compile({optimizer: optimizer, loss: 'categoricalCrossentropy'});
-themodel.summary();
-
-document.getElementById('modelComp').innerHTML= 'Model compiled.';
-await tf.nextFrame();
+//Load the architecture of the model
 
 //Vectorization
 console.log("Vectorization");
@@ -130,6 +124,13 @@ const y = labelsBuffer.toTensor();
 if(document.getElementById('inputEpoch').value){
   epochsNumber = document.getElementById('inputEpoch').value;
 }
+
+const jsonUpload = document.getElementById('json-upload');
+const weightsUpload = document.getElementById('weights-upload');
+const themodel = await tf.loadModel(tf.io.browserFiles([jsonUpload.files[0], weightsUpload.files[0]]));
+var optimizer = tf.train.rmsprop (learningRate = 0.01);
+themodel.compile({optimizer: optimizer, loss: 'categoricalCrossentropy'});
+
 const opts={
    epochs: epochsNumber,
    batchSize: 60,
@@ -179,18 +180,6 @@ function sample(prediction) {
 }
 
 
-
-function generateExampleBeginIndices_() {
-   // Prepare beginning indices of examples.
-   this.exampleBeginIndices_ = [];
-   for (let i = 0;i < this.textLen_ - this.sampleLen_ - 1; i += this.sampleStep_) {
-     this.exampleBeginIndices_.push(i);
-   }
-
-   // Randomly shuffle the beginning indices.
-   tf.util.shuffle(this.exampleBeginIndices_);
-   this.examplePosition_ = 0;
- }
 
 async function pred(){
 //var word = document.getElementById('texto').value;
