@@ -1,0 +1,258 @@
+<html>
+  <head>
+    <!-- Load TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@0.12.0"> </script>
+  </head>
+
+  <body>
+    <form>
+      <p>Select .txt file with train data:</p>
+      <input type="file" onchange="loadFile(this)">
+      <p>Load de JSON model and the weights:</p>
+        <input type="file" id="json-upload">
+          <input type="file" id="weights-upload">
+      <pre id="data"></pre>
+    </form>
+    <button onclick="createModel()">Generate</button>
+    <div id="modelStatus" class="verb">
+      <p id="textLen"> </p>
+        <p id="seqLen"> </p>
+          <p id="modelComp"> </p>
+            <p id="modelTrain"> </p>
+              <p id="modelTrain2"> </p>
+                <p id="modelEpoch"> </p>
+                  <p id="modelLoss"> </p>
+                    <p id="completed"> </p>
+    </div>
+    <div id="prediction" class="verb"></div>
+  </body>
+
+</html>
+
+
+<script type="text/javascript">
+function loadFile(o){
+         var fr = new FileReader();
+         fr.onload = function(e){
+                     showDataFile(e, o);
+                     };
+         fr.readAsText(o.files[0]);
+       }
+
+function showDataFile(e, o){
+         txt = e.target.result
+         //createModel();
+       }
+
+var char_indices;
+var indices_char =
+ {"0": "\n", "1": "", "2": " ", "3": "!", "4": "\U0022", "5": "&", "6": "'", "7": "(",
+"8": ")", "9": ",", "10": "-", "11": ".", "12": "0", "13": "1", "14": "2", "15": "3", "16": "4","17":
+"5", "18": "6", "19": "7", "20": "8", "21": "9", "22": ":", "23": ";", "24": "?", "25": "[", "26": "]",
+"27": "a", "28": "b", "29": "c", "30": "d", "31": "e", "32": "f",
+"33": "g", "34": "h", "35": "i", "36": "j", "37": "k", "38": "l", "39": "m", "40": "n", "41": "o",
+"42": "p", "43": "q", "44": "r", "45": "s", "46": "t", "47": "u", "48": "v", "49": "w", "50": "x",
+"51": "y", "52": "z", "53": "ï", "54": "\u2013", "55": "\u2014", "56": "\u2018"
+, "57": "\u2019", "58": "\u201c", "59": "\u201d", "60": "\u2026"};
+
+var txt;
+var INPUT_LENGTH= 20 ;
+var CHARS_TO_GENERATE = 200;
+var CREATIVITY = 0.5;
+var modelo;
+var epochsNumber = 1;
+
+
+async function createModel(){
+
+var maxlen=20;
+var step =3;
+var sentences = [];
+var next_chars = [];
+var chars;
+txt = txt.toLowerCase();
+var texto = Array.from(txt);
+console.log("Text length: "+txt.length);
+
+
+
+var inran = txt.length-maxlen;
+for (let i = 0; i<inran; i+=step) {
+    let tmp = txt.slice(i, i+maxlen);
+    let tmp2 = txt[i+maxlen];
+    sentences.push(tmp);
+    next_chars.push(tmp2);
+  }
+console.log('Number of sequences: '+sentences.length);
+
+document.getElementById('textLen').innerHTML='Text length: '+txt.length;
+document.getElementById('seqLen').innerHTML= 'Number of sequences: '+sentences.length;
+await tf.nextFrame();
+
+chars =texto.filter(onlyUnique);
+chars = chars.sort();
+char_indices = chars;
+//console.log('Characters: '+chars);
+
+var dict = [];
+for (let i = 0;i<chars.length;i++) {
+    dict[i] = chars[i];
+    }
+//console.log(dict);
+var charlen = chars.length;
+
+//Load the architecture of the model
+
+//Vectorization
+console.log("Vectorization");
+const sequencesBuffer = tf.buffer([sentences.length,maxlen,charlen]);
+const labelsBuffer = tf.buffer([sentences.length,charlen]);
+ for (let i = 0; i < sentences.length; ++i) {
+      let sentence = sentences[i];
+   for (let j = 0; j < sentence.length; ++j) {
+      caracter = sentence[j];
+      sequencesBuffer.set(1, i, j, char_indices.indexOf(caracter));
+   }
+   labelsBuffer.set(1, i, char_indices.indexOf(next_chars[i]));
+ }
+console.log(sequencesBuffer.get(0,0,0));
+const x = sequencesBuffer.toTensor();
+const y = labelsBuffer.toTensor();
+
+
+const jsonUpload = document.getElementById('json-upload');
+const weightsUpload = document.getElementById('weights-upload');
+const themodel = await tf.loadModel(tf.io.browserFiles([jsonUpload.files[0], weightsUpload.files[0]]));
+var optimizer = tf.train.rmsprop (learningRate = 0.01);
+themodel.compile({optimizer: optimizer, loss: 'categoricalCrossentropy'});
+
+const opts={
+   epochs: epochsNumber,
+   batchSize: 60,
+   callbacks:{
+   onEpochBegin: async(num,logs)=>{
+     await tf.nextFrame();
+     var ep = num+1;
+     document.getElementById('modelEpoch').innerHTML='Epoch: '+ep+"/"+epochsNumber
+   },
+   onTrainBegin: async()=>{
+     await tf.nextFrame();
+   },
+   onBatchEnd: async(num,logs)=>{
+     await tf.nextFrame();
+     //console.log('Loss: '+logs.loss);
+     document.getElementById('modelLoss').innerHTML= 'Current loss: '+logs.loss;
+   },
+   }
+}
+
+modelo = themodel;
+pred();
+/*
+console.log("Training model...");
+document.getElementById('modelTrain').innerHTML= 'Starting training with: '+epochsNumber+" Epochs.";
+document.getElementById('modelTrain2').innerHTML= 'Training model...';
+
+
+themodel.fit(x,y,opts).then(async results=>{
+          modelo = themodel;
+          console.log("Saving model...");
+          const saveResults = await themodel.save('downloads://trainedInJS');
+          console.log("Completed!");
+          document.getElementById('completed').innerHTML= 'Completed! You can now download de model (2 files)';
+          console.log(results.history.loss);
+          document.getElementById('modelLoss').innerHTML= 'Final loss: '+results.history.loss;
+          pred();
+        });*/
+}
+
+
+function sample(prediction) {
+  return tf.tidy(() => {
+    prediction = prediction.log();
+    const creativity = tf.scalar(CREATIVITY);
+    prediction = prediction.div(creativity);
+    prediction = prediction.exp();
+    prediction = prediction.div(prediction.sum());
+    prediction = prediction.mul(tf.randomUniform(prediction.shape));
+    return prediction.argMax();
+  });
+}
+
+
+
+async function pred(){
+//var word = document.getElementById('texto').value;
+var word = txt.slice(5,20);
+for(var i =0;i<CHARS_TO_GENERATE;i++){
+    const indexTensor = tf.tidy(() => {
+    const input = this.convert(word);
+    const prediction = modelo.predict(input).squeeze();
+    return sample(prediction);
+  })
+  const index = await indexTensor.data();
+  indexTensor.dispose();
+  word += indices_char[index];
+  document.getElementById('prediction').innerHTML= word;
+  console.log(word);
+  await tf.nextFrame();
+  }
+  //modelo.layers[0].getWeights()[1].print();
+}
+
+
+//Converts sentence to Tensor for feeding into model.
+function convert(sentence) {
+  var char_indices2 = {"\n": 0, "": 1, " ": 2, "!": 3, "\U0022": 4, "&": 5, "'": 6, "(": 7, ")": 8, ",": 9,
+   "-": 10, ".": 11, "0": 12, "1": 13, "2": 14, "3": 15, "4": 16, "5": 17, "6": 18, "7": 19, "8": 20,
+   "9": 21, ":": 22, ";": 23, "?": 24, "[": 25, "]": 26, "a": 27, "b": 28, "c": 29, "d": 30, "e": 31,
+   "f": 32, "g": 33, "h": 34, "i": 35, "j": 36, "k": 37, "l": 38, "m": 39, "n": 40, "o": 41, "p": 42,
+   "q": 43, "r": 44, "s": 45, "t": 46, "u": 47, "v": 48, "w": 49, "x": 50, "y": 51, "z": 52, "ï": 53,
+   "\u2013": 54, "\u2014": 55, "\u2018": 56,"\u2019": 57,"\u201c": 58,"\u201d": 59,"\u2026": 60}
+
+  sentence = sentence.toLowerCase();
+  sentence = sentence.split('').filter(x => x in char_indices2).join('');
+  if (sentence.length < INPUT_LENGTH) {
+    sentence = sentence.padStart(INPUT_LENGTH);
+  } else if (sentence.length > INPUT_LENGTH) {
+    sentence = sentence.substring(sentence.length - INPUT_LENGTH);
+  }
+  const buffer = tf.buffer([1, INPUT_LENGTH, Object.keys(indices_char).length]);
+  for (let i = 0; i < INPUT_LENGTH; i++) {
+    let char = sentence.charAt(i);
+    buffer.set(1, 0, i, char_indices.indexOf(char));
+  }
+  const input = buffer.toTensor();
+  return input;
+  }
+
+
+//UTILS
+function onlyUnique(value, index, self) {
+    return self.indexOf(value) === index;
+}
+
+function range(start, stop, step) {
+    if (typeof stop == 'undefined') {
+        // one param defined
+        stop = start;
+        start = 0;
+    }
+
+    if (typeof step == 'undefined') {
+        step = 1;
+    }
+
+    if ((step > 0 && start >= stop) || (step < 0 && start <= stop)) {
+        return [];
+    }
+
+    var result = [];
+    for (var i = start; step > 0 ? i < stop : i > stop; i += step) {
+        result.push(i);
+    }
+
+    return result;
+};
+
+</script>
